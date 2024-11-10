@@ -1,5 +1,5 @@
 # Build stage
-FROM golang:1.21-alpine AS builder
+FROM golang:1.22-alpine AS builder
 
 # 필요한 시스템 패키지 설치
 RUN apk add --no-cache git
