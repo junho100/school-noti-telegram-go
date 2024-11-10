@@ -12,6 +12,8 @@ type Config struct {
 	SchoolNoticeURL  string   `mapstructure:"SCHOOL_NOTICE_URL"`
 	Keywords         []string `mapstructure:"KEYWORDS"`
 	CheckInterval    string   `mapstructure:"CHECK_INTERVAL"`
+	RedisAddr        string   `mapstructure:"REDIS_ADDR"`
+	RedisPassword    string   `mapstructure:"REDIS_PASSWORD"`
 }
 
 func LoadConfig() (*Config, error) {
@@ -40,8 +42,8 @@ func LoadConfig() (*Config, error) {
 	if len(config.Keywords) == 0 {
 		return nil, fmt.Errorf("KEYWORDS가 설정되지 않았습니다")
 	}
-	if config.CheckInterval == "" {
-		config.CheckInterval = "24h" // 기본값 설정
+	if config.RedisAddr == "" {
+		config.RedisAddr = "localhost:6379" // 기본값 설정
 	}
 
 	return config, nil
