@@ -6,6 +6,7 @@ import (
 
 	"school-noti-telegram-go/internal/config"
 	"school-noti-telegram-go/internal/crawler"
+	"school-noti-telegram-go/internal/models"
 	"school-noti-telegram-go/internal/notifier"
 	"school-noti-telegram-go/internal/storage"
 
@@ -21,7 +22,10 @@ func main() {
 
 	// 컴포넌트 초기화
 	crawlerSvc := crawler.NewCrawler(cfg)
-	notifierSvc := notifier.NewTelegramNotifier(cfg)
+	notifierSvc, err := notifier.NewTelegramNotifier(cfg)
+	if err != nil {
+		log.Fatalf("Telegram 초기화 실패: %v", err)
+	}
 	storageSvc, err := storage.NewRedisStorage(cfg)
 	if err != nil {
 		log.Fatalf("Redis 초기화 실패: %v", err)
@@ -34,50 +38,47 @@ func main() {
 		log.Fatalf("시간대 설정 실패: %v", err)
 	}
 
-	// cron 작업 설정
 	c := cron.New(cron.WithLocation(loc))
 
-	// 매일 오전 10시와 오후 10시(22시)에 실행
-	if _, err := c.AddFunc("0 10,22 * * *", func() {
-		if err := runCrawlingJob(crawlerSvc, notifierSvc, storageSvc, cfg.Keywords); err != nil {
-			log.Printf("작업 실행 중 오류 발생: %v", err)
+	// 매일 오전 11시와 오후 11시에 실행
+	if _, err := c.AddFunc("0 11,23 * * *", func() {
+		notices, err := crawlerSvc.FetchAllNotices()
+		if err != nil {
+			log.Printf("공지사항 크롤링 실패: %v", err)
+			return
+		}
+
+		// 새로운 공지사항 필터링
+		var newNotices []models.Notice
+		for _, notice := range notices {
+			if !storageSvc.IsNoticeProcessed(notice.ID) {
+				newNotices = append(newNotices, notice)
+				if err := storageSvc.MarkNoticeAsProcessed(notice.ID); err != nil {
+					log.Printf("공지사항 처리 상태 저장 실패: %v", err)
+				}
+			}
+		}
+
+		// 새로운 공지사항이 없는 경우
+		if len(newNotices) == 0 {
+			if err := notifierSvc.SendMessage("발견된 공지사항이 없습니다."); err != nil {
+				log.Printf("메시지 전송 실패: %v", err)
+			}
+			return
+		}
+
+		// 새로운 공지사항 전송
+		for _, notice := range newNotices {
+			if err := notifierSvc.SendNotice(notice); err != nil {
+				log.Printf("공지사항 전송 실패: %v", err)
+			}
 		}
 	}); err != nil {
 		log.Fatalf("크론 작업 설정 실패: %v", err)
 	}
 
-	// 크론 작업 시작
 	c.Start()
 
-	// 프로그램 시작 시 즉시 한 번 실행
-	if err := runCrawlingJob(crawlerSvc, notifierSvc, storageSvc, cfg.Keywords); err != nil {
-		log.Printf("초기 작업 실행 중 오류 발생: %v", err)
-	}
-
-	// 프로그램이 종료되지 않도록 대기
+	// 프로그램 종료 방지
 	select {}
-}
-
-func runCrawlingJob(c crawler.Crawler, n notifier.TelegramNotifier, s *storage.RedisStorage, keywords []string) error {
-	notices, err := c.FetchNotices()
-	if err != nil {
-		return err
-	}
-
-	filteredNotices := c.FilterByKeywords(notices, keywords)
-
-	for _, notice := range filteredNotices {
-		if !s.IsNoticeProcessed(notice.ID) {
-			if err := n.SendNotice(notice); err != nil {
-				log.Printf("공지사항 전송 실패: %v", err)
-				continue
-			}
-
-			if err := s.MarkNoticeAsProcessed(notice.ID); err != nil {
-				log.Printf("공지사항 처리 상태 저장 실패: %v", err)
-			}
-		}
-	}
-
-	return nil
 }

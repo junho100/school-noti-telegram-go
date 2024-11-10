@@ -7,13 +7,14 @@ import (
 )
 
 type Config struct {
-	TelegramBotToken string   `mapstructure:"TELEGRAM_BOT_TOKEN"`
-	TelegramChatID   int64    `mapstructure:"TELEGRAM_CHAT_ID"`
-	SchoolNoticeURL  string   `mapstructure:"SCHOOL_NOTICE_URL"`
-	Keywords         []string `mapstructure:"KEYWORDS"`
-	CheckInterval    string   `mapstructure:"CHECK_INTERVAL"`
-	RedisAddr        string   `mapstructure:"REDIS_ADDR"`
-	RedisPassword    string   `mapstructure:"REDIS_PASSWORD"`
+	TelegramBotToken     string   `mapstructure:"TELEGRAM_BOT_TOKEN"`
+	TelegramChatID       int64    `mapstructure:"TELEGRAM_CHAT_ID"`
+	SchoolNoticeURL      string   `mapstructure:"SCHOOL_NOTICE_URL"`
+	SchoolNoticeKeywords []string `mapstructure:"SCHOOL_NOTICE_KEYWORDS"`
+	DeptGeneralURL       string   `mapstructure:"DEPT_GENERAL_URL"`
+	DeptScholarshipURL   string   `mapstructure:"DEPT_SCHOLARSHIP_URL"`
+	DeptNoticeKeywords   []string `mapstructure:"DEPT_NOTICE_KEYWORDS"`
+	RedisAddr            string   `mapstructure:"REDIS_ADDR"`
 }
 
 func LoadConfig() (*Config, error) {
@@ -39,11 +40,17 @@ func LoadConfig() (*Config, error) {
 	if config.SchoolNoticeURL == "" {
 		return nil, fmt.Errorf("SCHOOL_NOTICE_URL이 설정되지 않았습니다")
 	}
-	if len(config.Keywords) == 0 {
-		return nil, fmt.Errorf("KEYWORDS가 설정되지 않았습니다")
+	if config.DeptGeneralURL == "" {
+		return nil, fmt.Errorf("DEPT_GENERAL_URL이 설정되지 않았습니다")
+	}
+	if config.DeptScholarshipURL == "" {
+		return nil, fmt.Errorf("DEPT_SCHOLARSHIP_URL이 설정되지 않았습니다")
+	}
+	if len(config.DeptNoticeKeywords) == 0 {
+		return nil, fmt.Errorf("DEPT_NOTICE_KEYWORDS가 설정되지 않았습니다")
 	}
 	if config.RedisAddr == "" {
-		config.RedisAddr = "localhost:6379" // 기본값 설정
+		config.RedisAddr = "localhost:6379"
 	}
 
 	return config, nil

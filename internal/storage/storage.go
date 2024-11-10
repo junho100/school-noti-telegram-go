@@ -17,9 +17,8 @@ type RedisStorage struct {
 
 func NewRedisStorage(cfg *config.Config) (*RedisStorage, error) {
 	client := redis.NewClient(&redis.Options{
-		Addr:     cfg.RedisAddr,
-		Password: cfg.RedisPassword,
-		DB:       0,
+		Addr: cfg.RedisAddr,
+		DB:   0, // 기본 DB 사용
 	})
 
 	ctx := context.Background()
