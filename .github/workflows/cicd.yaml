@@ -1,0 +1,65 @@
+name: Docker Build, Push to ECR, and Deploy to Private EC2
+
+on:
+  push:
+    branches: ["master"]
+
+env:
+  AWS_REGION: ap-northeast-2
+  ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY }}
+
+jobs:
+  build-push-deploy:
+    name: Build, Push, and Deploy
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - name: Create .env file
+        run: |
+          echo "TELEGRAM_BOT_TOKEN=${{ secrets.TELEGRAM_BOT_TOKEN }}" >> .env
+          echo "TELEGRAM_CHAT_ID=${{ secrets.TELEGRAM_CHAT_ID }}" >> .env
+          echo "SCHOOL_NOTICE_URL=${{ secrets.SCHOOL_NOTICE_URL }}" >> .env
+          echo "SCHOOL_NOTICE_KEYWORDS=${{ secrets.SCHOOL_NOTICE_KEYWORDS }}" >> .env
+          echo "DEPT_GENERAL_URL=${{ secrets.DEPT_GENERAL_URL }}" >> .env
+          echo "DEPT_SCHOLARSHIP_URL=${{ secrets.DEPT_SCHOLARSHIP_URL }}" >> .env
+          echo "DEPT_NOTICE_KEYWORDS=${{ secrets.DEPT_NOTICE_KEYWORDS }}" >> .env
+          echo "REDIS_ADDR=${{ secrets.REDIS_ADDR }}" >> .env
+
+      - name: Build, tag, and push image to Amazon ECR
+        id: build-image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG -t $ECR_REGISTRY/$ECR_REPOSITORY:latest .
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+          echo "::set-output name=image::$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
+      - name: Create deploy.zip
+        run: |
+          zip deploy.zip deploy.sh appspec.yml
+
+      - name: Upload deploy.zip to S3
+        run: |
+          aws s3 cp deploy.zip s3://${{ secrets.S3_BUCKET }}/deploy.zip
+
+      - name: Create CodeDeploy Deployment
+        run: |
+          aws deploy create-deployment \
+          --application-name ${{ secrets.APPLICATION_NAME }} \
+          --deployment-group-name ${{ secrets.DEPLOYMENT_GROUP_NAME }} \
+          --s3-location bucket=${{ secrets.S3_BUCKET }},key=deploy.zip,bundleType=zip
