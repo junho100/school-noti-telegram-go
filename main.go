@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"time"
 
@@ -42,6 +43,9 @@ func main() {
 
 	// 매일 오전 11시와 오후 11시에 실행
 	if _, err := c.AddFunc("0 11,23 * * *", func() {
+		now := time.Now().In(loc)
+		checkTime := now.Format("2006-01-02 15:04")
+
 		notices, err := crawlerSvc.FetchAllNotices()
 		if err != nil {
 			log.Printf("공지사항 크롤링 실패: %v", err)
@@ -61,7 +65,8 @@ func main() {
 
 		// 새로운 공지사항이 없는 경우
 		if len(newNotices) == 0 {
-			if err := notifierSvc.SendMessage("발견된 공지사항이 없습니다."); err != nil {
+			message := fmt.Sprintf("발견된 공지사항이 없습니다.\n확인 시각: %s", checkTime)
+			if err := notifierSvc.SendMessage(message); err != nil {
 				log.Printf("메시지 전송 실패: %v", err)
 			}
 			return
