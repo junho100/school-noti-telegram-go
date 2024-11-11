@@ -43,6 +43,7 @@ func main() {
 
 	// 매일 오전 11시와 오후 11시에 실행
 	if _, err := c.AddFunc("0 11,23 * * *", func() {
+		startTime := time.Now() // 시작 시간 기록
 		now := time.Now().In(loc)
 		checkTime := now.Format("2006-01-02 15:04")
 
@@ -63,9 +64,12 @@ func main() {
 			}
 		}
 
+		// 실행 시간 계산
+		executionTime := time.Since(startTime)
+
 		// 새로운 공지사항이 없는 경우
 		if len(newNotices) == 0 {
-			message := fmt.Sprintf("발견된 공지사항이 없습니다.\n확인 시각: %s", checkTime)
+			message := fmt.Sprintf("발견된 공지사항이 없습니다.\n확인 시각: %s\n실행 소요 시간: %v", checkTime, executionTime)
 			if err := notifierSvc.SendMessage(message); err != nil {
 				log.Printf("메시지 전송 실패: %v", err)
 			}
@@ -77,6 +81,12 @@ func main() {
 			if err := notifierSvc.SendNotice(notice); err != nil {
 				log.Printf("공지사항 전송 실패: %v", err)
 			}
+		}
+
+		// 실행 완료 메시지 전송
+		summaryMessage := fmt.Sprintf("공지사항 처리 완료\n처리된 공지사항 수: %d개\n실행 소요 시간: %v", len(newNotices), executionTime)
+		if err := notifierSvc.SendMessage(summaryMessage); err != nil {
+			log.Printf("실행 완료 메시지 전송 실패: %v", err)
 		}
 	}); err != nil {
 		log.Fatalf("크론 작업 설정 실패: %v", err)
