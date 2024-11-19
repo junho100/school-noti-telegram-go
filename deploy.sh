@@ -6,6 +6,4 @@ docker stop noti || true
 docker rm noti || true
 docker run -d --name noti $url:latest
 
-# 사용하지 않는 Docker 이미지 정리
-echo "Cleaning up unused Docker images..."
 docker image prune -f --all
